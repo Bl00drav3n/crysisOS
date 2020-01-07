@@ -1,0 +1,341 @@
+.section .init
+.globl _start
+_start:
+  b main
+
+.section .text
+main:
+  mov sp,#0x8000
+
+  mov r0,#640
+  mov r1,#480
+  mov r2,#32
+  bl InitialiseFramebuffer
+  teq r0,#0
+  beq panic
+
+  fbInfoAddr .req r4
+  mov fbInfoAddr,r0
+
+  mov r0,#0
+  push {r0}
+render$:
+  // TODO: finish double buffering (right now we render to the back buffer and swap, but still only display buffer0!)
+  bl SwapBuffers
+  pattern .req r0
+  seq .req r1
+  ldr pattern,=ACTPatternFlash8
+  pop {seq}
+  bl ACTSetState
+  .unreq seq
+  seq .req r0
+  push {seq}
+  .unreq seq
+  .unreq pattern
+
+  fbAddr .req r3
+  bl GetBackbufferBase
+  mov fbAddr,r0
+  //ldr fbAddr,[fbInfoAddr,#0x20]
+
+  y .req r1
+  ldr y,[fbInfoAddr,#0x0C]
+  drawRow$:
+    x .req r2
+    ldr x,[fbInfoAddr,#0x08]
+    drawPixel$:
+      ldr r0,=Time
+      ldr r0,[r0]
+      add r0,x
+      add r0,y
+      loop$:
+        cmp r0,#0xff
+        subhi r0,#0x100
+        bhi loop$
+      push {r1}
+      ldr r1,=Sine
+      lsl r0,#2
+      add r1,r0
+      ldr r0,[r1]
+      pop {r1}
+      str r0,[fbAddr]
+      add fbAddr,#4
+      sub x,#1
+      teq x,#0
+      bne drawPixel$
+    sub y,#1
+    teq y,#0
+    bne drawRow$
+  push {r1}
+  ldr r1,=Time
+  ldr r0,[r1]
+  add r0,#4
+  cmp r0,#0xFF
+  subhi r0,#0x0100
+  str r0,[r1]
+  pop {r1}
+  b render$
+  .unreq fbAddr
+  .unreq fbInfoAddr
+
+.section .data
+.align 4
+Time:
+.int 0
+Sine:
+.int 0x00000080
+.int 0x00000083
+.int 0x00000086
+.int 0x00000089
+.int 0x0000008C
+.int 0x00000090
+.int 0x00000093
+.int 0x00000096
+.int 0x00000099
+.int 0x0000009C
+.int 0x0000009F
+.int 0x000000A2
+.int 0x000000A5
+.int 0x000000A8
+.int 0x000000AB
+.int 0x000000AE
+.int 0x000000B1
+.int 0x000000B3
+.int 0x000000B6
+.int 0x000000B9
+.int 0x000000BC
+.int 0x000000BF
+.int 0x000000C1
+.int 0x000000C4
+.int 0x000000C7
+.int 0x000000C9
+.int 0x000000CC
+.int 0x000000CE
+.int 0x000000D1
+.int 0x000000D3
+.int 0x000000D5
+.int 0x000000D8
+.int 0x000000DA
+.int 0x000000DC
+.int 0x000000DE
+.int 0x000000E0
+.int 0x000000E2
+.int 0x000000E4
+.int 0x000000E6
+.int 0x000000E8
+.int 0x000000EA
+.int 0x000000EB
+.int 0x000000ED
+.int 0x000000EF
+.int 0x000000F0
+.int 0x000000F1
+.int 0x000000F3
+.int 0x000000F4
+.int 0x000000F5
+.int 0x000000F6
+.int 0x000000F8
+.int 0x000000F9
+.int 0x000000FA
+.int 0x000000FA
+.int 0x000000FB
+.int 0x000000FC
+.int 0x000000FD
+.int 0x000000FD
+.int 0x000000FE
+.int 0x000000FE
+.int 0x000000FE
+.int 0x000000FF
+.int 0x000000FF
+.int 0x000000FF
+.int 0x000000FF
+.int 0x000000FF
+.int 0x000000FF
+.int 0x000000FF
+.int 0x000000FE
+.int 0x000000FE
+.int 0x000000FE
+.int 0x000000FD
+.int 0x000000FD
+.int 0x000000FC
+.int 0x000000FB
+.int 0x000000FA
+.int 0x000000FA
+.int 0x000000F9
+.int 0x000000F8
+.int 0x000000F6
+.int 0x000000F5
+.int 0x000000F4
+.int 0x000000F3
+.int 0x000000F1
+.int 0x000000F0
+.int 0x000000EF
+.int 0x000000ED
+.int 0x000000EB
+.int 0x000000EA
+.int 0x000000E8
+.int 0x000000E6
+.int 0x000000E4
+.int 0x000000E2
+.int 0x000000E0
+.int 0x000000DE
+.int 0x000000DC
+.int 0x000000DA
+.int 0x000000D8
+.int 0x000000D5
+.int 0x000000D3
+.int 0x000000D1
+.int 0x000000CE
+.int 0x000000CC
+.int 0x000000C9
+.int 0x000000C7
+.int 0x000000C4
+.int 0x000000C1
+.int 0x000000BF
+.int 0x000000BC
+.int 0x000000B9
+.int 0x000000B6
+.int 0x000000B3
+.int 0x000000B1
+.int 0x000000AE
+.int 0x000000AB
+.int 0x000000A8
+.int 0x000000A5
+.int 0x000000A2
+.int 0x0000009F
+.int 0x0000009C
+.int 0x00000099
+.int 0x00000096
+.int 0x00000093
+.int 0x00000090
+.int 0x0000008C
+.int 0x00000089
+.int 0x00000086
+.int 0x00000083
+.int 0x00000080
+.int 0x0000007D
+.int 0x0000007A
+.int 0x00000077
+.int 0x00000074
+.int 0x00000070
+.int 0x0000006D
+.int 0x0000006A
+.int 0x00000067
+.int 0x00000064
+.int 0x00000061
+.int 0x0000005E
+.int 0x0000005B
+.int 0x00000058
+.int 0x00000055
+.int 0x00000052
+.int 0x0000004F
+.int 0x0000004D
+.int 0x0000004A
+.int 0x00000047
+.int 0x00000044
+.int 0x00000041
+.int 0x0000003F
+.int 0x0000003C
+.int 0x00000039
+.int 0x00000037
+.int 0x00000034
+.int 0x00000032
+.int 0x0000002F
+.int 0x0000002D
+.int 0x0000002B
+.int 0x00000028
+.int 0x00000026
+.int 0x00000024
+.int 0x00000022
+.int 0x00000020
+.int 0x0000001E
+.int 0x0000001C
+.int 0x0000001A
+.int 0x00000018
+.int 0x00000016
+.int 0x00000015
+.int 0x00000013
+.int 0x00000011
+.int 0x00000010
+.int 0x0000000F
+.int 0x0000000D
+.int 0x0000000C
+.int 0x0000000B
+.int 0x0000000A
+.int 0x00000008
+.int 0x00000007
+.int 0x00000006
+.int 0x00000006
+.int 0x00000005
+.int 0x00000004
+.int 0x00000003
+.int 0x00000003
+.int 0x00000002
+.int 0x00000002
+.int 0x00000002
+.int 0x00000001
+.int 0x00000001
+.int 0x00000001
+.int 0x00000001
+.int 0x00000001
+.int 0x00000001
+.int 0x00000001
+.int 0x00000002
+.int 0x00000002
+.int 0x00000002
+.int 0x00000003
+.int 0x00000003
+.int 0x00000004
+.int 0x00000005
+.int 0x00000006
+.int 0x00000006
+.int 0x00000007
+.int 0x00000008
+.int 0x0000000A
+.int 0x0000000B
+.int 0x0000000C
+.int 0x0000000D
+.int 0x0000000F
+.int 0x00000010
+.int 0x00000011
+.int 0x00000013
+.int 0x00000015
+.int 0x00000016
+.int 0x00000018
+.int 0x0000001A
+.int 0x0000001C
+.int 0x0000001E
+.int 0x00000020
+.int 0x00000022
+.int 0x00000024
+.int 0x00000026
+.int 0x00000028
+.int 0x0000002B
+.int 0x0000002D
+.int 0x0000002F
+.int 0x00000032
+.int 0x00000034
+.int 0x00000037
+.int 0x00000039
+.int 0x0000003C
+.int 0x0000003F
+.int 0x00000041
+.int 0x00000044
+.int 0x00000047
+.int 0x0000004A
+.int 0x0000004D
+.int 0x0000004F
+.int 0x00000052
+.int 0x00000055
+.int 0x00000058
+.int 0x0000005B
+.int 0x0000005E
+.int 0x00000061
+.int 0x00000064
+.int 0x00000067
+.int 0x0000006A
+.int 0x0000006D
+.int 0x00000070
+.int 0x00000074
+.int 0x00000077
+.int 0x0000007A
+.int 0x0000007D
