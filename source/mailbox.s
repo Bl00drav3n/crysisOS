@@ -54,6 +54,15 @@
     mov pc, lr					# Return
 */
 
+/*
+MemoryBarrier:
+	mcr p15, 0, r3, c7, c5, 0	 // Invalidate instruction cache
+	mcr p15, 0, r3, c7, c5, 6	 // Invalidate BTC
+	mcr p15, 0, r3, c7, c10, 4 // Drain write buffer
+	mcr p15, 0, r3, c7, c5, 4	 // Prefetch flush
+	mov pc, lr					       // Return
+*/
+
 .globl GetMailboxBase
 GetMailboxBase:
   ldr r0,=0x2000B880
@@ -73,6 +82,7 @@ MailboxWrite:
   mailbox .req r0
   wait1$:
     status .req r3
+    mov status,#0
     ldr status,[mailbox,#0x18]  // load status register
     tst status,#0x80000000      // wait until mailbox not full
     .unreq status
@@ -95,7 +105,7 @@ MailboxRead:
   mailbox .req r0
   rightmail$:
     wait2$:
-      status .req r2
+      status .req r3
       ldr status,[mailbox,#0x18] // load status
       tst status,#0x40000000     // poll msg
       .unreq status

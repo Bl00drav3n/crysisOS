@@ -1,6 +1,12 @@
 .section .text
 .globl ACTSetState
-// result: r0 = sequence number
+/*
+  params:
+    r0: pattern address (32bit)
+    r1: sequence number
+  results:
+    r0: sequence number next
+*/
 ACTSetState:
   push {lr}
   mov r2, r0
@@ -52,6 +58,7 @@ loop$:
 .globl ACTPatternFlash2
 .globl ACTPatternFlash4
 .globl ACTPatternFlash8
+.globl ACTPatternFlash3x
 .globl ACTPatternSOS
 .align 2
 ACTPatternFlash0:
@@ -64,5 +71,7 @@ ACTPatternFlash4:
 .int 0b11001100110011001100110011001100
 ACTPatternFlash8:
 .int 0b10101010101010101010101010101010
+ACTPatternFlash3x:
+.int 0b00000001110001110001110000000000
 ACTPatternSOS:
 .int 0b10101001110001110001110001010100
