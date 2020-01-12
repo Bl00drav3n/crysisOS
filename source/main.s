@@ -3,339 +3,122 @@
 _start:
   b main
 
+.section .data
+.align 2
+Display:
+  .int 1920 // width
+  .int 1080 // height
+  .int 32   // depth
+  .int 0//FBFLAG_DOUBLE // flags
+
+.align 2
+Color:
+Red:
+  .int 0
+Green:
+  .int 0
+Blue:
+  .int 0
+
 .section .text
 main:
   mov sp,#0x8000
-
-  mov r0,#640
-  mov r1,#480
-  mov r2,#32
+  ldr r3,=Display
+  ldmia r3,{r0,r1,r2,r3}
   bl InitialiseFramebuffer
-  fbInfoAddr .req r4
-  mov fbInfoAddr,r0
-  teq fbInfoAddr,#0
+  teq r0,#0
   beq _panicGeneral
-
-  time .req r5
-  mov time,#0x00
+  bl SetGraphicsAddress
 
   mov r0,#0
   ldr r1,=LEDSequence
   str r0,[r1]
+
+  rnd .req r4
+  col .req r5
+  lastx .req r6
+  lasty .req r7
+  mov rnd,#0
+  mov col,#0
+  mov lastx,#0
+  mov lasty,#0
+
 render$:
   bl SwapBuffers
 
-  // TODO: Fix buffer overflow!
-
-  ldr r6,=LEDSequence
   ldr r0,=ACTPatternFlash8
-  ldr r1,[r6]
+  ldr r2,=LEDSequence
+  ldr r1,[r2]
+  push {r2}
   bl ACTSetState
-  str r0,[r6]
-  ldr r0,=100000
+  pop {r2}
+  str r0,[r2]
+  ldr r0,=500000
   bl Microsleep
 
-  fbAddr .req r3
-  bl GetBackbufferBase
-  mov fbAddr,r0
-  teq fbAddr,#0
-  beq _panicGraphics
+  x .req r8
+  y .req r9
+  mov r0,rnd
+  bl Random
+  mov x,r0
+  bl Random
+  mov y,r0
+  mov rnd,y
 
-  sineAddr .req r6
-  ldr sineAddr,=Sine
-  y .req r1
-  ldr y,[fbInfoAddr,#0x0C]
-  drawRow$:
-    x .req r2
-    ldr x,[fbInfoAddr,#0x08]
-    drawPixel$:
-    /*
-      mov r0,time
-      add r0,x
-      add r0,y
-      and r0,#0xff
-      ldr r0,[sineAddr,r0,lsl #2]
-    */
-      ldr r0,=0x0000FF00
-      str r0,[fbAddr]
-      add fbAddr,#4
-      sub x,#1
-      teq x,#0
-      bne drawPixel$
-    sub y,#1
-    teq y,#0
-    bne drawRow$
-  /*
-  ldr r0,[time]
-  add r0,#4
-  cmp r0,#0xFF
-  subhi r0,#0x100
-  str r0,[time]
-  */
+/*
+  ldr r1,=Color
+  ldr r0,[r1,#8]
+  add r0,#0x20
+  cmp r0,#0x100
+  movhi r0,#0
+  strhi r0,[r1,#8]
+  ldrhi r0,[r1,#4]
+  addhi r0,#0x20
+  cmphi r0,#0x100
+  movhi r0,#0
+  strhi r0,[r1,#4]
+  ldrhi r0,[r1]
+  addhi r0,#0x20
+  cmphi r0,#0x100
+  movhi r0,#0
+  strhi r0,[r1]
+
+  ldr r0,=Red
+  ldr r0,[r0]
+  ldr r1,=Green
+  ldr r1,[r1]
+  ldr r2,=Blue
+  ldr r2,[r2]
+  orr r0,r1,r0,lsl #8
+  orr r0,r2,r0,lsl #8
+  and r0,#0x00FFFFFF
+*/
+  mov r0,col
+  ldr r0,=0x00FFFFFFF
+  bl SetBrushColor
+  add col,#20
+  and col,#0x00FFFFFF
+
+  lsr x,#22
+  lsr y,#22
+  add x,#448
+  add y,#28
+
+  mov r0,lastx
+  mov r1,lasty
+  mov r2,x
+  mov r3,y
+  bl DrawLine
+
+  mov lastx,x
+  mov lasty,y
+
   b render$
-  .unreq time
-  .unreq sineAddr
-  .unreq fbAddr
-  .unreq fbInfoAddr
+  .unreq rnd
+  .unreq x
+  .unreq y
 
 .section .data
 .align 2
 LEDSequence:
   .int 0
-Sine:
-  .int 0x00000080
-  .int 0x00000083
-  .int 0x00000086
-  .int 0x00000089
-  .int 0x0000008C
-  .int 0x00000090
-  .int 0x00000093
-  .int 0x00000096
-  .int 0x00000099
-  .int 0x0000009C
-  .int 0x0000009F
-  .int 0x000000A2
-  .int 0x000000A5
-  .int 0x000000A8
-  .int 0x000000AB
-  .int 0x000000AE
-  .int 0x000000B1
-  .int 0x000000B3
-  .int 0x000000B6
-  .int 0x000000B9
-  .int 0x000000BC
-  .int 0x000000BF
-  .int 0x000000C1
-  .int 0x000000C4
-  .int 0x000000C7
-  .int 0x000000C9
-  .int 0x000000CC
-  .int 0x000000CE
-  .int 0x000000D1
-  .int 0x000000D3
-  .int 0x000000D5
-  .int 0x000000D8
-  .int 0x000000DA
-  .int 0x000000DC
-  .int 0x000000DE
-  .int 0x000000E0
-  .int 0x000000E2
-  .int 0x000000E4
-  .int 0x000000E6
-  .int 0x000000E8
-  .int 0x000000EA
-  .int 0x000000EB
-  .int 0x000000ED
-  .int 0x000000EF
-  .int 0x000000F0
-  .int 0x000000F1
-  .int 0x000000F3
-  .int 0x000000F4
-  .int 0x000000F5
-  .int 0x000000F6
-  .int 0x000000F8
-  .int 0x000000F9
-  .int 0x000000FA
-  .int 0x000000FA
-  .int 0x000000FB
-  .int 0x000000FC
-  .int 0x000000FD
-  .int 0x000000FD
-  .int 0x000000FE
-  .int 0x000000FE
-  .int 0x000000FE
-  .int 0x000000FF
-  .int 0x000000FF
-  .int 0x000000FF
-  .int 0x000000FF
-  .int 0x000000FF
-  .int 0x000000FF
-  .int 0x000000FF
-  .int 0x000000FE
-  .int 0x000000FE
-  .int 0x000000FE
-  .int 0x000000FD
-  .int 0x000000FD
-  .int 0x000000FC
-  .int 0x000000FB
-  .int 0x000000FA
-  .int 0x000000FA
-  .int 0x000000F9
-  .int 0x000000F8
-  .int 0x000000F6
-  .int 0x000000F5
-  .int 0x000000F4
-  .int 0x000000F3
-  .int 0x000000F1
-  .int 0x000000F0
-  .int 0x000000EF
-  .int 0x000000ED
-  .int 0x000000EB
-  .int 0x000000EA
-  .int 0x000000E8
-  .int 0x000000E6
-  .int 0x000000E4
-  .int 0x000000E2
-  .int 0x000000E0
-  .int 0x000000DE
-  .int 0x000000DC
-  .int 0x000000DA
-  .int 0x000000D8
-  .int 0x000000D5
-  .int 0x000000D3
-  .int 0x000000D1
-  .int 0x000000CE
-  .int 0x000000CC
-  .int 0x000000C9
-  .int 0x000000C7
-  .int 0x000000C4
-  .int 0x000000C1
-  .int 0x000000BF
-  .int 0x000000BC
-  .int 0x000000B9
-  .int 0x000000B6
-  .int 0x000000B3
-  .int 0x000000B1
-  .int 0x000000AE
-  .int 0x000000AB
-  .int 0x000000A8
-  .int 0x000000A5
-  .int 0x000000A2
-  .int 0x0000009F
-  .int 0x0000009C
-  .int 0x00000099
-  .int 0x00000096
-  .int 0x00000093
-  .int 0x00000090
-  .int 0x0000008C
-  .int 0x00000089
-  .int 0x00000086
-  .int 0x00000083
-  .int 0x00000080
-  .int 0x0000007D
-  .int 0x0000007A
-  .int 0x00000077
-  .int 0x00000074
-  .int 0x00000070
-  .int 0x0000006D
-  .int 0x0000006A
-  .int 0x00000067
-  .int 0x00000064
-  .int 0x00000061
-  .int 0x0000005E
-  .int 0x0000005B
-  .int 0x00000058
-  .int 0x00000055
-  .int 0x00000052
-  .int 0x0000004F
-  .int 0x0000004D
-  .int 0x0000004A
-  .int 0x00000047
-  .int 0x00000044
-  .int 0x00000041
-  .int 0x0000003F
-  .int 0x0000003C
-  .int 0x00000039
-  .int 0x00000037
-  .int 0x00000034
-  .int 0x00000032
-  .int 0x0000002F
-  .int 0x0000002D
-  .int 0x0000002B
-  .int 0x00000028
-  .int 0x00000026
-  .int 0x00000024
-  .int 0x00000022
-  .int 0x00000020
-  .int 0x0000001E
-  .int 0x0000001C
-  .int 0x0000001A
-  .int 0x00000018
-  .int 0x00000016
-  .int 0x00000015
-  .int 0x00000013
-  .int 0x00000011
-  .int 0x00000010
-  .int 0x0000000F
-  .int 0x0000000D
-  .int 0x0000000C
-  .int 0x0000000B
-  .int 0x0000000A
-  .int 0x00000008
-  .int 0x00000007
-  .int 0x00000006
-  .int 0x00000006
-  .int 0x00000005
-  .int 0x00000004
-  .int 0x00000003
-  .int 0x00000003
-  .int 0x00000002
-  .int 0x00000002
-  .int 0x00000002
-  .int 0x00000001
-  .int 0x00000001
-  .int 0x00000001
-  .int 0x00000001
-  .int 0x00000001
-  .int 0x00000001
-  .int 0x00000001
-  .int 0x00000002
-  .int 0x00000002
-  .int 0x00000002
-  .int 0x00000003
-  .int 0x00000003
-  .int 0x00000004
-  .int 0x00000005
-  .int 0x00000006
-  .int 0x00000006
-  .int 0x00000007
-  .int 0x00000008
-  .int 0x0000000A
-  .int 0x0000000B
-  .int 0x0000000C
-  .int 0x0000000D
-  .int 0x0000000F
-  .int 0x00000010
-  .int 0x00000011
-  .int 0x00000013
-  .int 0x00000015
-  .int 0x00000016
-  .int 0x00000018
-  .int 0x0000001A
-  .int 0x0000001C
-  .int 0x0000001E
-  .int 0x00000020
-  .int 0x00000022
-  .int 0x00000024
-  .int 0x00000026
-  .int 0x00000028
-  .int 0x0000002B
-  .int 0x0000002D
-  .int 0x0000002F
-  .int 0x00000032
-  .int 0x00000034
-  .int 0x00000037
-  .int 0x00000039
-  .int 0x0000003C
-  .int 0x0000003F
-  .int 0x00000041
-  .int 0x00000044
-  .int 0x00000047
-  .int 0x0000004A
-  .int 0x0000004D
-  .int 0x0000004F
-  .int 0x00000052
-  .int 0x00000055
-  .int 0x00000058
-  .int 0x0000005B
-  .int 0x0000005E
-  .int 0x00000061
-  .int 0x00000064
-  .int 0x00000067
-  .int 0x0000006A
-  .int 0x0000006D
-  .int 0x00000070
-  .int 0x00000074
-  .int 0x00000077
-  .int 0x0000007A
-  .int 0x0000007D

@@ -54,15 +54,6 @@
     mov pc, lr					# Return
 */
 
-/*
-MemoryBarrier:
-	mcr p15, 0, r3, c7, c5, 0	 // Invalidate instruction cache
-	mcr p15, 0, r3, c7, c5, 6	 // Invalidate BTC
-	mcr p15, 0, r3, c7, c10, 4 // Drain write buffer
-	mcr p15, 0, r3, c7, c5, 4	 // Prefetch flush
-	mov pc, lr					       // Return
-*/
-
 .globl GetMailboxBase
 GetMailboxBase:
   ldr r0,=0x2000B880
@@ -77,22 +68,25 @@ MailboxWrite:
   channel .req r1
   value .req r2
   mov value,r0
-  push {lr}
+  push {r4,lr}
+
+  mailbox .req r4
   bl GetMailboxBase
-  mailbox .req r0
+  mov mailbox,r0
   wait1$:
     status .req r3
-    mov status,#0
+    bl ReadWriteBarrier
     ldr status,[mailbox,#0x18]  // load status register
     tst status,#0x80000000      // wait until mailbox not full
     .unreq status
     bne wait1$
   orr value,channel
   .unreq channel
+  bl MemoryBarrier
   str value,[mailbox,#0x20] // write to mailbox 1
   .unreq value
   .unreq mailbox
-  pop {pc}
+  pop {r4,pc}
 
 .globl MailboxRead
 MailboxRead:
@@ -100,17 +94,20 @@ MailboxRead:
   movhi pc,lr
   channel .req r1
   mov channel,r0
-  push {lr}
+  push {r4,lr}
   bl GetMailboxBase
-  mailbox .req r0
+  mailbox .req r4
+  mov mailbox,r0
   rightmail$:
     wait2$:
       status .req r3
-      ldr status,[mailbox,#0x18] // load status
-      tst status,#0x40000000     // poll msg
+      bl ReadWriteBarrier
+      ldr status,[mailbox,#0x18] // load status register
+      tst status,#0x40000000     // wait for new message
       .unreq status
       bne wait2$
     mail .req r2
+    bl MemoryBarrier
     ldr mail,[mailbox,#0x00]     // read from mailbox 0
     inchan .req r3
     and inchan,mail,#0x0F
@@ -121,4 +118,4 @@ MailboxRead:
     .unreq channel
   and r0,mail,#0xFFFFFFF0        // mask out channel bits from msg
   .unreq mail
-  pop {pc}
+  pop {r4,pc}

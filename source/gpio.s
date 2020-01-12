@@ -54,3 +54,36 @@ SetGpio:
   .unreq gpioAddr
   pop {pc}
 
+.globl GpioWriteOutput8
+GpioWriteOutput8:
+  push {r4,r5,r6,lr}
+  n .req r4
+  addr .req r5
+  cnt .req r6
+  and n,r0,#0x000000FF
+  ldr addr,=GpioPins
+  mov cnt,#0
+  loop1$:
+    ldr r0,[addr,cnt]
+    mov r1,#1
+    bl SetGpioFunction
+    ldr r0,[addr,cnt]
+    and r1,n,#1
+    bl SetGpio
+    lsr n,#1
+    add cnt,#4
+    teq cnt,#32
+    bne loop1$
+  pop {r4,r5,r6,pc}
+
+.section .data
+.align 2
+GpioPins:
+  .int 17
+  .int 18
+  .int 27
+  .int 22
+  .int 23
+  .int 24
+  .int 25
+  .int 4

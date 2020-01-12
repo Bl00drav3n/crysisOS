@@ -1,24 +1,38 @@
+.globl FBFLAG_DOUBLE
+.globl FBFLAG_VSYNC
+FBFLAG_DOUBLE = 0x00000001
+FBFLAG_VSYNC  = 0x00000002
+
 .section .data
 .align 4
 FramebufferDesc:
-  .int 0 // 0x00 Backbuffer id (0 or 1)
+  FramebufferDesc.backbuffer = 0x00
+  .int 0
+  FramebufferDesc.flags = 0x04
+  .int 0
 
 .align 4
 .globl FramebufferInfo
 FramebufferInfo:
-  .int 0 // 0x00 physical width
-  .int 0 // 0x04 physical height
-  .int 0 // 0x08 virtual width
-  .int 0 // 0x0C virtual height
-  .int 0 // 0x10 pitch [filled by VC]
-  .int 0 // 0x14 bit depth
-  .int 0 // 0x18 x-offset
-  .int 0 // 0x1C y-offset
-  .int 0 // 0x20 pointer [filled by VC]
-  .int 0 // 0x24 size [filled by VC]
-  .int 0 // padding (?)
+  FramebufferInfo.w = 0x00
   .int 0
+  FramebufferInfo.h = 0x04
   .int 0
+  FramebufferInfo.vw = 0x08
+  .int 0
+  FramebufferInfo.vh = 0x0C
+  .int 0
+  FramebufferInfo.pitch = 0x10
+  .int 0
+  FramebufferInfo.depth = 0x14
+  .int 0
+  FramebufferInfo.x = 0x18
+  .int 0
+  FramebufferInfo.y = 0x1C
+  .int 0
+  FramebufferInfo.ptr = 0x20
+  .int 0
+  FramebufferInfo.size = 0x24
   .int 0
 
 .align 4
@@ -40,25 +54,29 @@ InitialiseFramebuffer:
   width .req r0
   height .req r1
   depth .req r2
+  flags .req r3
   cmp width,#4096
   cmpls height,#4096
   cmpls depth,#32
   movhi r0,#0
   movhi pc,lr
+  .unreq flags
 
-  push {r4,lr}
-  height2 .req r3
-  mov height2,height,lsl #1 // need twice as much physical storage for double buffering
+  push {r4,r5,r6,lr}
+  flags .req r5
+  mov flags,r3
+
   fbInfoAddr .req r4
   ldr fbInfoAddr,=FramebufferInfo
-  str width,[fbInfoAddr,#0x00]
-  str height2,[fbInfoAddr,#0x04]
-  str width,[fbInfoAddr,#0x08]
-  str height,[fbInfoAddr,#0x0C]
-  str depth,[fbInfoAddr,#0x14]
+  str width,[fbInfoAddr,#FramebufferInfo.w]
+  str height,[fbInfoAddr,#FramebufferInfo.h]
+  str width,[fbInfoAddr,#FramebufferInfo.vw]
+  tst flags,#FBFLAG_DOUBLE
+  lslne height,#1
+  str height,[fbInfoAddr,#FramebufferInfo.vh]
+  str depth,[fbInfoAddr,#FramebufferInfo.depth]
   .unreq width
   .unreq height
-  .unreq height2
   .unreq depth
 
   mov r0,fbInfoAddr
@@ -69,56 +87,49 @@ InitialiseFramebuffer:
   bl MailboxRead      // nonzero result means an error occured
   teq r0,#0
   movne r0,#0
-  popne {r4,pc}
+  popne {r4,r5,r6,pc}
 
-  bufId .req r0
   desc .req r1
   ldr desc,=FramebufferDesc
-  mov bufId,#1
-  str bufId,[desc]
-  .unreq bufId
+  mov r0,#1
+  str r0,[desc,#FramebufferDesc.backbuffer]
+  mov r0,flags
+  str r0,[desc,#FramebufferDesc.flags]
   .unreq desc
 
   mov r0,fbInfoAddr
   .unreq fbInfoAddr
 
-  pop {r4,pc}
+  pop {r4,r5,r6,pc}
 
 .globl GetBackbufferBase
 GetBackbufferBase:
-  // if backbuffer = 0, render to buffer0, display buffer1 and vice versa if backbuffer = 1
   pointer .req r0
   fbInfoAddr .req r1
-  fbDescAddr .req r2
   ldr fbInfoAddr,=FramebufferInfo
-  ldr pointer,[fbInfoAddr,#0x20]
+  ldr pointer,[fbInfoAddr,#FramebufferInfo.ptr]
+
+  fbDescAddr .req r2
   ldr fbDescAddr,=FramebufferDesc
-  ldr r2,[fbDescAddr]
+  ldr r3,[fbDescAddr,#FramebufferDesc.flags]
+  tst r3,#FBFLAG_DOUBLE
+  moveq pc,lr
+
+  // NOTE: double buffered, if backbuffer = 0, render to buffer0, display buffer1 and vice versa if backbuffer = 1
+  ldr r2,[fbDescAddr,#FramebufferDesc.backbuffer]
   .unreq fbDescAddr
   teq r2,#0
   moveq pc,lr
 
   pitch .req r2
-  vheight .req r3
-  ldr vheight,[fbInfoAddr,#0x0C]
-  ldr pitch,[fbInfoAddr,#0x10]
+  height .req r3
+  ldr height,[fbInfoAddr,#FramebufferInfo.h]
+  ldr pitch,[fbInfoAddr,#FramebufferInfo.pitch]
   .unreq fbInfoAddr
-  mul r2,vheight,pitch
+  mla pointer,pitch,height,pointer
   .unreq pitch
-  .unreq vheight
-  add pointer,r2
+  .unreq height
   .unreq pointer
-  mov pc,lr
-
-/*
-  params:
-    r0: framebuffer info base address
-  returns:
-    r0: virtual framebuffer height
-*/
-GetFramebufferHeight:
-  fbInfoAddr .req r0
-  ldr r0,[fbInfoAddr,#0x0C]
   mov pc,lr
 
 /*
@@ -187,32 +198,34 @@ GetFrontbufferVirtualOffset:
   movne r0,#0 // if backbuffer id = 1 => frontbuffer id = 0 and offset = 0x0000
   popne {pc}
   ldr r0,=FramebufferInfo
-  bl GetFramebufferHeight
+  ldr r0,[r0,#FramebufferInfo.h]
   pop {pc}
 
 .globl SwapBuffers
 SwapBuffers:
-  push {lr}
-  backbuffer .req r0
   fbDescAddr .req r1
   ldr fbDescAddr,=FramebufferDesc
-  ldr backbuffer,[fbDescAddr]
+  ldr r0,[fbDescAddr,#FramebufferDesc.flags]
+  tst r0,#FBFLAG_DOUBLE
+  moveq pc,lr
+
+  push {lr}
+  backbuffer .req r0
+  ldr backbuffer,[fbDescAddr,#FramebufferDesc.backbuffer]
   mov r2,#1
   sub backbuffer,r2,backbuffer
-  str backbuffer,[fbDescAddr]
+  str backbuffer,[fbDescAddr,#FramebufferDesc.backbuffer]
   .unreq backbuffer
   .unreq fbDescAddr
-  // TODO: TEST
-  pop {pc}
   
-  bl GetFrontbufferVirtualOffset
-  tag .req r0
-  xoffset .req r1
   yoffset .req r2
+  bl GetFrontbufferVirtualOffset
   mov yoffset,r0
+  tag .req r0
   ldr tag,=0x00048009 // set virtual offset
   //ldr r0,=0x00040009 // get virtual offset
   //ldr r0,=0x00044009 // test virtual offset
+  xoffset .req r1
   mov xoffset,#0
   bl MBSendVbufMsg
   teq r0,#0
