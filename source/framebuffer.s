@@ -1,38 +1,23 @@
-.globl FBFLAG_DOUBLE
-.globl FBFLAG_VSYNC
-FBFLAG_DOUBLE = 0x00000001
-FBFLAG_VSYNC  = 0x00000002
+.include "framebuffer.inc"
 
 .section .data
 .align 4
 FramebufferDesc:
-  FramebufferDesc.backbuffer = 0x00
   .int 0
-  FramebufferDesc.flags = 0x04
   .int 0
 
 .align 4
 .globl FramebufferInfo
 FramebufferInfo:
-  FramebufferInfo.w = 0x00
   .int 0
-  FramebufferInfo.h = 0x04
   .int 0
-  FramebufferInfo.vw = 0x08
   .int 0
-  FramebufferInfo.vh = 0x0C
   .int 0
-  FramebufferInfo.pitch = 0x10
   .int 0
-  FramebufferInfo.depth = 0x14
   .int 0
-  FramebufferInfo.x = 0x18
   .int 0
-  FramebufferInfo.y = 0x1C
   .int 0
-  FramebufferInfo.ptr = 0x20
   .int 0
-  FramebufferInfo.size = 0x24
   .int 0
 
 .align 4
@@ -203,6 +188,7 @@ GetFrontbufferVirtualOffset:
 
 .globl SwapBuffers
 SwapBuffers:
+  // TODO: check if virtual offset works as intended
   fbDescAddr .req r1
   ldr fbDescAddr,=FramebufferDesc
   ldr r0,[fbDescAddr,#FramebufferDesc.flags]
@@ -217,9 +203,8 @@ SwapBuffers:
   str backbuffer,[fbDescAddr,#FramebufferDesc.backbuffer]
   .unreq backbuffer
   .unreq fbDescAddr
-  
-  yoffset .req r2
   bl GetFrontbufferVirtualOffset
+  yoffset .req r2
   mov yoffset,r0
   tag .req r0
   ldr tag,=0x00048009 // set virtual offset

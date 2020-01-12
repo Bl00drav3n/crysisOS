@@ -1,3 +1,5 @@
+.include "framebuffer.inc"
+
 .section .init
 .globl _start
 _start:
@@ -9,7 +11,8 @@ Display:
   .int 1920 // width
   .int 1080 // height
   .int 32   // depth
-  .int 0//FBFLAG_DOUBLE // flags
+  //.int FBFLAG_DOUBLE // flags
+  .int 0 // flags
 
 .align 2
 Color:
@@ -46,6 +49,7 @@ main:
 render$:
   bl SwapBuffers
 
+/*
   ldr r0,=ACTPatternFlash8
   ldr r2,=LEDSequence
   ldr r1,[r2]
@@ -53,8 +57,9 @@ render$:
   bl ACTSetState
   pop {r2}
   str r0,[r2]
-  ldr r0,=500000
+  ldr r0,=16000
   bl Microsleep
+*/
 
   x .req r8
   y .req r9
@@ -93,17 +98,24 @@ render$:
   orr r0,r2,r0,lsl #8
   and r0,#0x00FFFFFF
 */
-  mov r0,col
-  ldr r0,=0x00FFFFFFF
-  bl SetBrushColor
-  add col,#20
-  and col,#0x00FFFFFF
 
   lsr x,#22
   lsr y,#22
   add x,#448
   add y,#28
 
+  mov r0,col
+  bl SetBrushColor
+  add col,#20
+  and col,#0x00FFFFFF
+  mov r0,lastx
+  mov r1,lasty
+  mov r2,x
+  mov r3,y
+  bl DrawRect
+
+  mov r0,#0x00FFFFFF
+  bl SetBrushColor
   mov r0,lastx
   mov r1,lasty
   mov r2,x
